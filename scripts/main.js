@@ -1,72 +1,102 @@
-// Function to get tokens on the map
-function getTokens() {
-  let players = [];
-  let npcs = [];
-  
-  canvas.tokens.placeables.forEach(token => {
-    if (token.actor.data.type === "npc") {
-      npcs.push(token);
-    } else if (token.actor.data.type === "character") {
-      players.push(token);
-    }
-  });
-  return { players, npcs };
-}
-
-// Function to get tokens on the map
-function getTokens() {
-  let players = [];
-  let npcs = [];
-  
-  canvas.tokens.placeables.forEach(token => {
-    if (token.actor.data.type === "npc") {
-      npcs.push(token);
-    } else if (token.actor.data.type === "character") {
-      players.push(token);
-    }
-  });
-  return { players, npcs };
-}
-// Function to calculate distance between two tokens
-function calculateDistance(token1, token2) {
-  let dx = token1.x - token2.x;
-  let dy = token1.y - token2.y;
+// Helper function to calculate the distance between two tokens
+function calculateDistance(tokenA, tokenB) {
+  const dx = tokenA.x - tokenB.x;
+  const dy = tokenA.y - tokenB.y;
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-// Suggest an action for each NPC
+// Function to get a random action from the NPC's list of actions
+function getRandomAction(npc) {
+  // Get the NPC's available actions (attacks, spells, abilities)
+  const actions = npc.actor.items.filter(item => {
+    // Only return usable actions (like weapon attacks, spells, abilities)
+    return item.type === "weapon" || item.type === "spell" || item.type === "feat";
+  });
+
+  if (actions.length === 0) {
+    console.warn(`${npc.name} has no available combat actions.`);
+    return null; // No available actions
+  }
+
+  // Pick a random action from the available ones
+  const randomIndex = Math.floor(Math.random() * actions.length);
+  return actions[randomIndex];
+}
+
+// Suggest action for each NPC based on the nearest player
 function suggestActionForNPC(npc, players) {
   let closestPlayer = null;
   let minDistance = Infinity;
-  
+
   players.forEach(player => {
-    let distance = calculateDistance(npc, player);
+    const distance = calculateDistance(npc, player);
     if (distance < minDistance) {
       minDistance = distance;
       closestPlayer = player;
     }
   });
+
+  // If there's no player to target, return
+  if (!closestPlayer) return null;
+
+  // First action: Move towards the closest player
+  const moveAction = `Move towards ${closestPlayer.name}`;
   
-  let action = minDistance <= 30 ? 'Attack' : 'Move towards';
-  return { action, target: closestPlayer };
+  // Get a random action from the NPC's available actions
+  const randomAction = getRandomAction(npc);
+  const actionMessage = randomAction ? `Use ${randomAction.name}` : null;
+
+  // Return both actions
+  return { moveAction, actionMessage, target: closestPlayer };
 }
-// Function to send the NPC action suggestion to the DM
-function sendMessage(npc, action, target) {
-  let message = `${npc.name} will ${action} ${target.name}.`;
+
+// Function to send a whisper to the GM with NPC action suggestions
+function sendNpcActionMessage(npc, moveAction, actionMessage, target) {
+  let message = `${npc.name} will ${moveAction}.`;
+  
+  if (actionMessage) {
+    message += ` Then, they will ${actionMessage} on ${target.name}. (if within range)`;
+  }
+
   ChatMessage.create({
     content: message,
-    whisper: ChatMessage.getWhisperRecipients("GM")
+    whisper: ChatMessage.getWhisperRecipients("GM") // Whisper to the GM
   });
 }
 
-// Hook into the start of each combat turn
-Hooks.on("updateCombat", (combat, changed, options, userId) => {
-  if (combat.combatant && combat.combatant.token) {
-    let currentToken = canvas.tokens.get(combat.combatant.token._id);
-    if (currentToken.actor.data.type === "npc") {
-      let { players, npcs } = getTokens();
-      let action = suggestActionForNPC(currentToken, players);
-      sendMessage(currentToken, action.action, action.target);
-    }
+// Hook into the combat tracker to suggest actions on NPC turns
+Hooks.on("updateCombat", (combat, updateData, options, userId) => {
+  // Check if the current combatant is an NPC
+  const currentCombatant = combat.combatant.token;
+  if (!currentCombatant || currentCombatant.actor.type !== "npc") return;
+
+  // Get all players and NPCs on the scene
+  const { players, npcs } = getTokens();
+
+  // Find the current NPC token in the list
+  const currentNpc = npcs.find(npc => npc.id === currentCombatant.id);
+  if (!currentNpc) return;
+
+  // Suggest actions for the NPC
+  const suggestion = suggestActionForNPC(currentNpc, players);
+  if (suggestion) {
+    sendNpcActionMessage(currentNpc, suggestion.moveAction, suggestion.actionMessage, suggestion.target);
   }
 });
+
+// Function to get all player and NPC tokens on the current scene
+function getTokens() {
+  let players = [];
+  let npcs = [];
+  
+  canvas.tokens.placeables.forEach(token => {
+    // Access token.actor.type and token.actor.system instead of deprecated .data
+    if (token.actor?.type === "npc") {
+      npcs.push(token);
+    } else if (token.actor?.type === "character") {
+      players.push(token);
+    }
+  });
+  
+  return { players, npcs };
+}
