@@ -1,0 +1,13 @@
+{
+  "name": "npc-ai-helper",
+  "title": "NPC AI Helper",
+  "description": "Helps the DM by suggesting NPC actions based on player token locations.",
+  "version": "1.0.0",
+  "author": "Your Name",
+  "scripts": ["scripts/main.js"],
+  "styles": ["styles/styles.css"],
+  "system": ["dnd5e"],
+  "compatibility": {
+    "minimum": "12",
+    "verified": "12"
+}
