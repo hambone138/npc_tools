@@ -56,10 +56,13 @@ function suggestActionForNPC(npc, players) {
   return { moveAction, actionMessage, target: closestPlayer, actionUuid };
 }
 
-// Function to send a whisper to the GM with NPC action suggestions, including UUID
+// Function to send a whisper to the GM with NPC action suggestions, including UUID and speed
 function sendNpcActionMessage(npc, moveAction, actionMessage, target, actionUuid) {
-  let message = `${npc.name} will ${moveAction}.`;
-  
+  // Retrieve the NPC's speed from the actor data
+  const speed = npc.actor.system.attributes.movement.walk || "unknown speed";
+
+  let message = `${npc.name} will ${moveAction} with a speed of ${speed}.`;
+
   if (actionMessage) {
     // Embedding the action link within the action message
     const actionLink = `@UUID[${actionUuid}]{${actionMessage}}`;
@@ -98,7 +101,7 @@ function getTokens() {
   let npcs = [];
   
   canvas.tokens.placeables.forEach(token => {
-    // Access token.actor.type and token.actor.system instead of deprecated .data
+    // Access token.actor.type and token.actor.system
     if (token.actor?.type === "npc") {
       npcs.push(token);
     } else if (token.actor?.type === "character") {
