@@ -5,7 +5,7 @@ function calculateDistance(tokenA, tokenB) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-// Function to get a random action from the NPC's list of actions
+// Function to get a random action from the NPC's list of actions, returning its UUID as well
 function getRandomAction(npc) {
   // Get the NPC's available actions (attacks, spells, abilities)
   const actions = npc.actor.items.filter(item => {
@@ -20,7 +20,10 @@ function getRandomAction(npc) {
 
   // Pick a random action from the available ones
   const randomIndex = Math.floor(Math.random() * actions.length);
-  return actions[randomIndex];
+  const action = actions[randomIndex];
+
+  // Return both action name and UUID
+  return { name: action.name, uuid: action.uuid };
 }
 
 // Suggest action for each NPC based on the nearest player
@@ -44,18 +47,23 @@ function suggestActionForNPC(npc, players) {
   
   // Get a random action from the NPC's available actions
   const randomAction = getRandomAction(npc);
-  const actionMessage = randomAction ? `Use ${randomAction.name}` : null;
+  if (!randomAction) return null;
 
-  // Return both actions
-  return { moveAction, actionMessage, target: closestPlayer };
+  const actionMessage = `${randomAction.name}`;
+  const actionUuid = randomAction.uuid;
+
+  // Return both actions and UUID
+  return { moveAction, actionMessage, target: closestPlayer, actionUuid };
 }
 
-// Function to send a whisper to the GM with NPC action suggestions
-function sendNpcActionMessage(npc, moveAction, actionMessage, target) {
+// Function to send a whisper to the GM with NPC action suggestions, including UUID
+function sendNpcActionMessage(npc, moveAction, actionMessage, target, actionUuid) {
   let message = `${npc.name} will ${moveAction}.`;
   
   if (actionMessage) {
-    message += ` Then, they will ${actionMessage} on ${target.name}. (if within range)`;
+    // Embedding the action link within the action message
+    const actionLink = `@UUID[${actionUuid}]{${actionMessage}}`;
+    message += ` Then, they will use ${actionLink} on ${target.name}. (if within range)`;
   }
 
   ChatMessage.create({
@@ -80,7 +88,7 @@ Hooks.on("updateCombat", (combat, updateData, options, userId) => {
   // Suggest actions for the NPC
   const suggestion = suggestActionForNPC(currentNpc, players);
   if (suggestion) {
-    sendNpcActionMessage(currentNpc, suggestion.moveAction, suggestion.actionMessage, suggestion.target);
+    sendNpcActionMessage(currentNpc, suggestion.moveAction, suggestion.actionMessage, suggestion.target, suggestion.actionUuid);
   }
 });
 
