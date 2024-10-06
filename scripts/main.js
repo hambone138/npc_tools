@@ -10,7 +10,7 @@ function getRandomAction(npc) {
   // Get the NPC's available actions (attacks, spells, abilities)
   const actions = npc.actor.items.filter(item => {
     // Only return usable actions (like weapon attacks, spells, abilities)
-    return item.type === "weapon" || item.type === "spell" || item.type === "feat";
+    return item.type === "weapon" || item.type === "spell";
   });
 
   if (actions.length === 0) {
