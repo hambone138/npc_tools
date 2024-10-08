@@ -35,6 +35,12 @@ function formatAttributes(npc) {
   return formattedAttributes;
 }
 
+// Helper function to calculate movement in grids
+function calculateMovementSpaces(npc) {
+  const movementSpeed = npc.actor.system.attributes.movement.walk;
+  return Math.floor(movementSpeed / 5); // Each grid is 5 ft
+}
+
 // Suggest action for each NPC based on the nearest player
 function suggestActionForNPC(npc, players) {
   let closestPlayer = null;
@@ -50,14 +56,15 @@ function suggestActionForNPC(npc, players) {
 
   if (!closestPlayer) return null;
 
-  const moveAction = `Move towards ${closestPlayer.name}`;
+  const moveSpaces = calculateMovementSpaces(npc);
+  const moveAction = `Move (${moveSpaces}) towards ${closestPlayer.name}`;
   const randomAction = getRandomAction(npc);
   if (!randomAction) return null;
 
   return { moveAction, actionMessage: randomAction.name, target: closestPlayer, actionUuid: randomAction.uuid };
 }
 
-// Function to send a whisper to the GM with NPC action suggestions, including UUID and attributes
+// Function to send a whisper to the GM with NPC action suggestions, including UUID, attributes, and movement
 function sendNpcActionMessage(npc, moveAction, actionMessage, target, actionUuid) {
   let message = `${npc.name} will ${moveAction}.`;
 
@@ -66,9 +73,8 @@ function sendNpcActionMessage(npc, moveAction, actionMessage, target, actionUuid
     message += ` Then, they will use ${actionLink} on ${target.name}. (if within range)`;
   }
 
-  // Get the NPC's attribute modifiers and add to the message
   const attributes = formatAttributes(npc);
-  message += `\nAttributes: ${attributes}`;
+  message += `\n\nAttributes: ${attributes}`;
 
   ChatMessage.create({
     content: message,
