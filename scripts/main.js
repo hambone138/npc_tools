@@ -44,9 +44,10 @@ function calculateMovementSpaces(npc) {
   return Math.floor(movementSpeed / 5); // Each grid is 5 ft
 }
 
-// Function to suggest an action for each NPC based on their current or nearest player target
+// Function to suggest an action for each NPC based on their current or nearest player target and intelligence attribute
 function suggestActionForNPC(npc, players) {
   let targetPlayer = npcTargets[npc.id]; // Check if this NPC already has a target
+  const intelligence = npc.actor.system.abilities.int.value;
 
   // If there is no target or the target is no longer present, find a new one
   if (!targetPlayer || !players.some(player => player.id === targetPlayer.id)) {
@@ -61,12 +62,49 @@ function suggestActionForNPC(npc, players) {
 
   if (!targetPlayer) return null;
 
+  // Determine NPC's reaction based on intelligence
+  let reactionMessage = '';
+  if (intelligence <= 4) {
+    // Intelligence 1-4: Attacks the closest target
+    reactionMessage = 'Attacks the closest target';
+  } else if (intelligence <= 7) {
+    // Intelligence 5-7: Uses ranged attack if available
+    const rangedActions = npc.actor.items.filter(item => 
+      (item.type === "weapon" || item.type === "spell") && item.system.range.value > 5
+    );
+    
+    if (rangedActions.length > 0) {
+      targetPlayer = findClosestPlayer(npc, players);
+      reactionMessage = 'Uses a ranged attack';
+    } else {
+      reactionMessage = 'Attacks the closest target due to lack of ranged options';
+    }
+  } else {
+    // Intelligence 8+: Has a chance to switch targets or flee if low on health
+    const otherNpcs = getTokens().npcs.filter(otherNpc => otherNpc.id !== npc.id);
+    const npcHealth = npc.actor.system.attributes.hp.value;
+    const npcMaxHealth = npc.actor.system.attributes.hp.max;
+
+    const lowHealthNpcs = otherNpcs.filter(otherNpc => 
+      otherNpc.actor.system.attributes.hp.value < otherNpc.actor.system.attributes.hp.max * 0.25
+    );
+
+    if (lowHealthNpcs.length > 0 && Math.random() > 0.5) {
+      targetPlayer = findClosestPlayer(lowHealthNpcs[0], players);
+      reactionMessage = 'Switches target to aid an ally at lower health';
+    } else if (npcHealth < npcMaxHealth * 0.75) {
+      reactionMessage = 'Attempts to flee due to low health';
+    } else {
+      reactionMessage = 'Attacks the closest target';
+    }
+  }
+
   const moveSpaces = calculateMovementSpaces(npc);
   const moveAction = `Move (${moveSpaces}) towards ${targetPlayer.name}`;
   const randomAction = getRandomAction(npc);
   if (!randomAction) return null;
 
-  return { moveAction, actionMessage: randomAction.name, target: targetPlayer, actionUuid: randomAction.uuid };
+  return { moveAction, actionMessage: randomAction.name, target: targetPlayer, actionUuid: randomAction.uuid, reactionMessage };
 }
 
 // Helper function to find the closest player to an NPC
@@ -85,8 +123,8 @@ function findClosestPlayer(npc, players) {
   return closestPlayer;
 }
 
-// Function to send a whisper to the GM with NPC action suggestions, including UUID, attributes, and movement
-function sendNpcActionMessage(npc, moveAction, actionMessage, target, actionUuid) {
+// Function to send a whisper to the GM with NPC action suggestions, including UUID, attributes, movement, and reaction
+function sendNpcActionMessage(npc, moveAction, actionMessage, target, actionUuid, reactionMessage) {
   let message = `${npc.name} will ${moveAction}.`;
 
   if (actionMessage) {
@@ -96,6 +134,7 @@ function sendNpcActionMessage(npc, moveAction, actionMessage, target, actionUuid
 
   const attributes = formatAttributes(npc);
   message += `\nAttributes: ${attributes}`;
+  message += `\nReaction: ${reactionMessage}`;
 
   ChatMessage.create({
     content: message,
@@ -114,7 +153,7 @@ Hooks.on("updateCombat", (combat, updateData, options, userId) => {
 
   const suggestion = suggestActionForNPC(currentNpc, players);
   if (suggestion) {
-    sendNpcActionMessage(currentNpc, suggestion.moveAction, suggestion.actionMessage, suggestion.target, suggestion.actionUuid);
+    sendNpcActionMessage(currentNpc, suggestion.moveAction, suggestion.actionMessage, suggestion.target, suggestion.actionUuid, suggestion.reactionMessage);
   }
 });
 
