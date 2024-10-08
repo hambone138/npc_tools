@@ -101,7 +101,7 @@ function suggestActionForNPC(npc, players) {
   }
 
   const moveSpaces = calculateMovementSpaces(npc);
-  const moveAction = `Move (${moveSpaces}) towards ${targetPlayer.name}`;
+  const moveAction = `Move (${moveSpaces})`;
   const randomAction = getRandomAction(npc);
   if (!randomAction) return null;
 
@@ -126,16 +126,17 @@ function findClosestPlayer(npc, players) {
 
 // Function to send a whisper to the GM with NPC action suggestions, including UUID, attributes, movement, and reaction
 function sendNpcActionMessage(npc, moveAction, actionMessage, target, actionUuid, reactionMessage) {
-  let message = `${npc.name} will ${moveAction}.`;
+  let message = `<h2>${npc.name}</h2>`;
+  message += `<strong>Reaction</strong>: ${reactionMessage}.<br>`;
 
   if (actionMessage) {
     const actionLink = `@UUID[${actionUuid}]{${actionMessage}}`;
-    message += ` Then, they will use ${actionLink} on ${target.name}. (if within range)`;
+    message += `<strong>Target</strong>: ${target.name}<br><strong>Move</strong>: ${moveAction}<br><strong>Action</strong>:${actionLink}`;
   }
 
   const attributes = formatAttributes(npc);
-  message += `\nAttributes: ${attributes}`;
-  message += `\nReaction: ${reactionMessage}`;
+  message += `<br><strong>Attributes</strong>: ${attributes}`;
+  
 
   ChatMessage.create({
     content: message,
