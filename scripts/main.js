@@ -1,3 +1,6 @@
+// Object to store NPC targets by NPC ID
+let npcTargets = {};
+
 // Helper function to calculate the distance between two tokens
 function calculateDistance(tokenA, tokenB) {
   const dx = tokenA.x - tokenB.x;
@@ -41,8 +44,33 @@ function calculateMovementSpaces(npc) {
   return Math.floor(movementSpeed / 5); // Each grid is 5 ft
 }
 
-// Suggest action for each NPC based on the nearest player
+// Function to suggest an action for each NPC based on their current or nearest player target
 function suggestActionForNPC(npc, players) {
+  let targetPlayer = npcTargets[npc.id]; // Check if this NPC already has a target
+
+  // If there is no target or the target is no longer present, find a new one
+  if (!targetPlayer || !players.some(player => player.id === targetPlayer.id)) {
+    targetPlayer = findClosestPlayer(npc, players);
+    npcTargets[npc.id] = targetPlayer; // Update the target for future rounds
+
+    // Log to console when a new target is assigned
+    if (targetPlayer) {
+      console.log(`${npc.name} has selected a new target: ${targetPlayer.name}`);
+    }
+  }
+
+  if (!targetPlayer) return null;
+
+  const moveSpaces = calculateMovementSpaces(npc);
+  const moveAction = `Move (${moveSpaces}) towards ${targetPlayer.name}`;
+  const randomAction = getRandomAction(npc);
+  if (!randomAction) return null;
+
+  return { moveAction, actionMessage: randomAction.name, target: targetPlayer, actionUuid: randomAction.uuid };
+}
+
+// Helper function to find the closest player to an NPC
+function findClosestPlayer(npc, players) {
   let closestPlayer = null;
   let minDistance = Infinity;
 
@@ -54,14 +82,7 @@ function suggestActionForNPC(npc, players) {
     }
   });
 
-  if (!closestPlayer) return null;
-
-  const moveSpaces = calculateMovementSpaces(npc);
-  const moveAction = `Move (${moveSpaces}) towards ${closestPlayer.name}`;
-  const randomAction = getRandomAction(npc);
-  if (!randomAction) return null;
-
-  return { moveAction, actionMessage: randomAction.name, target: closestPlayer, actionUuid: randomAction.uuid };
+  return closestPlayer;
 }
 
 // Function to send a whisper to the GM with NPC action suggestions, including UUID, attributes, and movement
@@ -74,7 +95,7 @@ function sendNpcActionMessage(npc, moveAction, actionMessage, target, actionUuid
   }
 
   const attributes = formatAttributes(npc);
-  message += `\n\nAttributes: ${attributes}`;
+  message += `\nAttributes: ${attributes}`;
 
   ChatMessage.create({
     content: message,
@@ -112,3 +133,9 @@ function getTokens() {
 
   return { players, npcs };
 }
+
+// Hook to log npcTargets and clear it once combat ends
+Hooks.on("deleteCombat", () => {
+  console.log("NPC Targets at the end of combat:", npcTargets);
+  npcTargets = {}; // Clear the object for the next combat
+});
