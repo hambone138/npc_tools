@@ -74,24 +74,25 @@ function suggestActionForNPC(npc, players) {
     );
     
     if (rangedActions.length > 0) {
-      targetPlayer = findClosestPlayer(npc, players);
       reactionMessage = 'Uses a ranged attack';
     } else {
       reactionMessage = 'Attacks the closest target due to lack of ranged options';
     }
   } else {
-    // Intelligence 8+: Has a chance to switch targets or flee if low on health
+    // Intelligence 8+: Has a chance to switch targets to aid a low-health NPC or flee if below 75% health
     const otherNpcs = getTokens().npcs.filter(otherNpc => otherNpc.id !== npc.id);
     const npcHealth = npc.actor.system.attributes.hp.value;
     const npcMaxHealth = npc.actor.system.attributes.hp.max;
-
+    
+    // Check for any NPCs with low health to possibly aid
     const lowHealthNpcs = otherNpcs.filter(otherNpc => 
       otherNpc.actor.system.attributes.hp.value < otherNpc.actor.system.attributes.hp.max * 0.25
     );
 
     if (lowHealthNpcs.length > 0 && Math.random() > 0.5) {
-      targetPlayer = findClosestPlayer(lowHealthNpcs[0], players);
-      reactionMessage = 'Switches target to aid an ally at lower health';
+      const allyToAid = lowHealthNpcs[Math.floor(Math.random() * lowHealthNpcs.length)];
+      targetPlayer = findClosestPlayer(allyToAid, players);
+      reactionMessage = `Switches target to aid ${allyToAid.name} who is at low health`;
     } else if (npcHealth < npcMaxHealth * 0.75) {
       reactionMessage = 'Attempts to flee due to low health';
     } else {
